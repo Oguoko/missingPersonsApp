@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "109258134554",
+    "project_id": "missing-tanzania-app",
+    "storage_bucket": "missing-tanzania-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109258134554:android:34df77c9741614793cada3",
+        "android_client_info": {
+          "package_name": "com.example.missing_persons_tz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzuKtqcKDE2lIhEAXk9esOFA-2hKAPiqY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
