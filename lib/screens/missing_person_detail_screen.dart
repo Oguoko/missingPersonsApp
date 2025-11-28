@@ -1,160 +1,115 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
 import '../models/missing_person.dart';
-import '../models/comment.dart';
-import 'package:uuid/uuid.dart';
 
-class MissingPersonDetailScreen extends StatefulWidget {
+class MissingPersonDetailScreen extends StatelessWidget {
   final String personId;
-
-  const MissingPersonDetailScreen({super.key, required this.personId});
-
-  @override
-  State<MissingPersonDetailScreen> createState() =>
-      _MissingPersonDetailScreenState();
-}
-
-class _MissingPersonDetailScreenState extends State<MissingPersonDetailScreen> {
   final FirestoreService _service = FirestoreService();
-  final TextEditingController _commentController = TextEditingController();
+
+  MissingPersonDetailScreen({required this.personId});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Missing Person Details")),
+      appBar: AppBar(
+        title: Text("Case Details"),
+      ),
       body: FutureBuilder<MissingPerson?>(
-        future: _service.getMissingPerson(widget.personId),
+        future: _service.getMissingPerson(personId),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData) {
+            return Center(child: CircularProgressIndicator());
           }
 
-          final person = snapshot.data;
-          if (person == null) {
-            return const Center(child: Text("Person not found."));
-          }
+          final p = snapshot.data!;
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Photos
-                SizedBox(
-                  height: 200,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: person.photos
-                        .map((url) => Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: Image.network(url),
-                            ))
-                        .toList(),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                Text(
-                  person.name,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 8),
-                Text("Age: ${person.age}"),
-                Text("Gender: ${person.gender}"),
-                const SizedBox(height: 8),
-
-                Text(
-                  "Last Seen Location:",
-                  style:
-                      const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(person.lastSeenLocation),
-                const SizedBox(height: 8),
-
-                Text(
-                  "Description:",
-                  style:
-                      const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(person.physicalDescription),
-                const SizedBox(height: 20),
-
-                Text(
-                  "Status: ${person.status}",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: person.status == "missing"
-                        ? Colors.red
-                        : Colors.green,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                const Divider(),
-
-                // COMMENTS SECTION
-                const Text(
-                  "Comments",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                ),
-                const SizedBox(height: 10),
-
-                StreamBuilder<List<Comment>>(
-                  stream: _service.getComments(widget.personId),
-                  builder: (context, commentSnapshot) {
-                    if (!commentSnapshot.hasData) {
-                      return const Center(
-                          child: CircularProgressIndicator());
-                    }
-
-                    final comments = commentSnapshot.data!;
-
-                    return Column(
-                      children: comments
-                          .map(
-                            (c) => ListTile(
-                              title: Text(c.comment),
-                              subtitle: Text(
-                                "By: ${c.userId} • ${c.createdAt.toString()}",
-                                style:
-                                    const TextStyle(fontSize: 12, color: Colors.grey),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ADD COMMENT
-                TextField(
-                  controller: _commentController,
-                  decoration: InputDecoration(
-                    labelText: "Add a comment...",
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.send),
-                      onPressed: () async {
-                        if (_commentController.text.trim().isEmpty) return;
-
-                        final newComment = Comment(
-                          id: const Uuid().v4(),
-                          comment: _commentController.text.trim(),
-                          userId: _service.currentUserId ?? "anonymous",
-                          createdAt: DateTime.now(),
+                // IMAGES CAROUSEL
+                if (p.photos.isNotEmpty)
+                  SizedBox(
+                    height: 260,
+                    child: PageView(
+                      children: p.photos.map((url) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(url, fit: BoxFit.cover),
                         );
-
-                        await _service.addComment(
-                            widget.personId, newComment);
-
-                        _commentController.clear();
-                      },
+                      }).toList(),
                     ),
                   ),
+
+                SizedBox(height: 20),
+
+                // NAME + STATUS BADGE
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      p.name,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: p.status == "missing"
+                            ? Colors.red.shade200
+                            : Colors.green.shade200,
+                      ),
+                      child: Text(
+                        p.status.toUpperCase(),
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
+
+                SizedBox(height: 10),
+
+                Text("Age: ${p.age}   |   Gender: ${p.gender}",
+                    style: TextStyle(fontSize: 16)),
+
+                SizedBox(height: 20),
+
+                // PHYSICAL DESCRIPTION
+                Text(
+                  "Physical Description",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                SizedBox(height: 6),
+                Text(p.physicalDescription),
+
+                SizedBox(height: 20),
+
+                // LAST SEEN LOCATION
+                Text(
+                  "Last Seen Location",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                SizedBox(height: 6),
+                Text(p.lastSeenLocation),
+
+                SizedBox(height: 30),
+
+                Divider(),
+
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: Icon(Icons.share),
+                    label: Text("Share Case"),
+                  ),
+                ),
+
+                SizedBox(height: 20),
               ],
             ),
           );

@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,6 +23,7 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
   final FirestoreService _service = FirestoreService();
 
   List<File> _images = [];
+  List<Uint8List> _webImages = [];   // <- NEW for web
 
   // Form fields
   String _name = "";
@@ -31,20 +35,35 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
   bool _loading = false;
 
   Future<void> pickImages() async {
-    final picked = await _picker.pickMultiImage();
-    setState(() {
+  final picked = await _picker.pickMultiImage();
+  if (picked != null) {
+    if (kIsWeb) {
+      _webImages = [];
+      for (var xfile in picked) {
+        final bytes = await xfile.readAsBytes();    // Fix: await each file
+        _webImages.add(bytes);
+      }
+    } else {
       _images = picked.map((file) => File(file.path)).toList();
-    });
+    }
+
+    setState(() {});
   }
+}
+
+
+
+
 
   Future<void> submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please upload at least 1 image.")),
-      );
-      return;
-    }
+    if (_images.isEmpty && _webImages.isEmpty) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Please upload at least 1 image.")),
+  );
+  return;
+}
+
 
     _formKey.currentState!.save();
     setState(() => _loading = true);
@@ -52,12 +71,31 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
     try {
       String id = const Uuid().v4();
 
-      // Upload images
-      List<String> downloadUrls = [];
-      for (var file in _images) {
-        String url = await _service.uploadImage(file, id);
-        downloadUrls.add(url);
-      }
+      // Upload images (Web + Mobile)
+List<String> downloadUrls = [];
+
+if (kIsWeb) {
+  // Web upload using bytes
+  for (var bytes in _webImages) {
+    final url = await _service.uploadImageUnified(
+      personId: id,
+      bytes: bytes,
+    );
+    downloadUrls.add(url);
+  }
+} else {
+  // Mobile upload using File
+  for (var file in _images) {
+    final url = await _service.uploadImageUnified(
+      personId: id,
+      file: file,
+    );
+    downloadUrls.add(url);
+  }
+}
+
+
+
 
       // Build the person model
       final person = MissingPerson(
@@ -146,8 +184,16 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
 
               Wrap(
                 spacing: 10,
+                runSpacing: 10,
                 children: [
-                  ..._images.map((img) => Image.file(img, height: 80)),
+                  if (kIsWeb)
+                    ..._webImages.map(
+                      (bytes) => Image.memory(bytes, height: 80, width: 80, fit: BoxFit.cover),
+                    )
+                  else
+                    ..._images.map(
+                      (file) => Image.file(file, height: 80, width: 80, fit: BoxFit.cover),
+                    ),
                   InkWell(
                     onTap: pickImages,
                     child: Container(

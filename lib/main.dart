@@ -9,7 +9,9 @@ import 'screens/missing_person_detail_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const MyApp());
 }
@@ -22,11 +24,18 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Missing Persons TZ',
       debugShowCheckedModeBanner: false,
+
+      // Initial Screen
       initialRoute: '/',
+
       routes: {
+        // Home Page
         '/': (context) => MissingPersonsListScreen(),
+
+        // Add Missing Person Form
         '/add': (context) => AddMissingPersonScreen(),
-        // NEW — Step 10.2
+
+        // Detail Page — passing Firestore ID
         '/details': (context) {
           final id = ModalRoute.of(context)!.settings.arguments as String;
           return MissingPersonDetailScreen(personId: id);

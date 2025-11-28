@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
 import '../models/missing_person.dart';
+import 'missing_person_detail_screen.dart';
 
 class MissingPersonsListScreen extends StatelessWidget {
   final FirestoreService _service = FirestoreService();
-
-  MissingPersonsListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Missing Persons"),
+        title: Text("Missing Persons TZ"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: Icon(Icons.add),
             onPressed: () {
-              Navigator.pushNamed(context, "/add");
+              Navigator.pushNamed(context, '/add');
             },
           ),
         ],
@@ -25,51 +24,62 @@ class MissingPersonsListScreen extends StatelessWidget {
         stream: _service.getMissingPersons(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator());
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text("No missing persons reported yet."),
+            return Center(
+              child: Text(
+                "No missing persons reported yet.",
+                style: TextStyle(fontSize: 16),
+              ),
             );
           }
+          print("Snapshot: ${snapshot.data}");
 
-          final people = snapshot.data!;
+
+          print("STREAM DATA: ${snapshot.data}");
+          print("SNAPSHOT HAS DATA: ${snapshot.hasData}");
+          print("SNAPSHOT LENGTH: ${snapshot.data?.length}");
+
+
+          final persons = snapshot.data!;
 
           return ListView.builder(
-            itemCount: people.length,
+            padding: EdgeInsets.all(10),
+            itemCount: persons.length,
             itemBuilder: (context, index) {
-              final p = people[index];
+              final p = persons[index];
+              final photo = p.photos.isNotEmpty ? p.photos.first : null;
 
               return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: EdgeInsets.symmetric(vertical: 10),
                 child: ListTile(
-                  leading: p.photos.isNotEmpty
-                      ? Image.network(
-                          p.photos.first,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.person, size: 40),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: photo != null
+                        ? Image.network(photo, width: 60, height: 60, fit: BoxFit.cover)
+                        : Container(
+                            width: 60,
+                            height: 60,
+                            color: Colors.grey.shade300,
+                            child: Icon(Icons.person, size: 32),
+                          ),
+                  ),
                   title: Text(
                     p.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text("Last seen: ${p.lastSeenLocation}"),
-
-                  trailing: Text(
-                    p.status.toUpperCase(),
-                    style: TextStyle(
-                      color: p.status == "missing" ? Colors.red : Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  trailing: Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
-                    Navigator.pushNamed(context, "/details", arguments: p.id);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            MissingPersonDetailScreen(personId: p.id),
+                      ),
+                    );
                   },
                 ),
               );
