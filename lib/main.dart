@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:flutter/material.dart';
 
-import 'screens/missing_persons_list_screen.dart';
+import 'firebase_options.dart';
 import 'screens/add_missing_person_screen.dart';
 import 'screens/missing_person_detail_screen.dart';
+import 'screens/missing_persons_list_screen.dart';
+import 'ui/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,18 +25,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Missing Persons TZ',
       debugShowCheckedModeBanner: false,
-
-      // Initial Screen
+      theme: buildAppTheme(),
       initialRoute: '/',
-
       routes: {
-        // Home Page
         '/': (context) => MissingPersonsListScreen(),
-
-        // Add Missing Person Form
-        '/add': (context) => AddMissingPersonScreen(),
-
-        // Detail Page — passing Firestore ID
+        '/add': (context) => const AddMissingPersonScreen(),
         '/details': (context) {
           final id = ModalRoute.of(context)!.settings.arguments as String;
           return MissingPersonDetailScreen(personId: id);
