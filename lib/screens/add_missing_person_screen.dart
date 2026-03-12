@@ -1,20 +1,21 @@
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
-import '../services/firestore_service.dart';
 import '../models/missing_person.dart';
-import '../models/comment.dart';
+import '../services/firestore_service.dart';
+import '../ui/app_theme.dart';
+import '../ui/app_widgets.dart';
 
 class AddMissingPersonScreen extends StatefulWidget {
   const AddMissingPersonScreen({super.key});
 
   @override
-  _AddMissingPersonScreenState createState() => _AddMissingPersonScreenState();
+  State<AddMissingPersonScreen> createState() => _AddMissingPersonScreenState();
 }
 
 class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
@@ -23,24 +24,24 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
   final FirestoreService _service = FirestoreService();
 
   List<File> _images = [];
-  List<Uint8List> _webImages = [];   // <- NEW for web
+  List<Uint8List> _webImages = [];
 
-  // Form fields
-  String _name = "";
+  String _name = '';
   int _age = 0;
-  String _gender = "Male";
-  String _description = "";
-  String _lastSeenLocation = "";
+  String _gender = 'Male';
+  String _description = '';
+  String _lastSeenLocation = '';
 
   bool _loading = false;
 
   Future<void> pickImages() async {
-  final picked = await _picker.pickMultiImage();
-  if (picked != null) {
+    final picked = await _picker.pickMultiImage();
+    if (picked.isEmpty) return;
+
     if (kIsWeb) {
       _webImages = [];
       for (var xfile in picked) {
-        final bytes = await xfile.readAsBytes();    // Fix: await each file
+        final bytes = await xfile.readAsBytes();
         _webImages.add(bytes);
       }
     } else {
@@ -49,21 +50,16 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
 
     setState(() {});
   }
-}
-
-
-
-
 
   Future<void> submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_images.isEmpty && _webImages.isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text("Please upload at least 1 image.")),
-  );
-  return;
-}
 
+    if (_images.isEmpty && _webImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload at least 1 image.')),
+      );
+      return;
+    }
 
     _formKey.currentState!.save();
     setState(() => _loading = true);
@@ -71,33 +67,26 @@ class _AddMissingPersonScreenState extends State<AddMissingPersonScreen> {
     try {
       String id = const Uuid().v4();
 
-      // Upload images (Web + Mobile)
-List<String> downloadUrls = [];
+      List<String> downloadUrls = [];
 
-if (kIsWeb) {
-  // Web upload using bytes
-  for (var bytes in _webImages) {
-    final url = await _service.uploadImageUnified(
-      personId: id,
-      bytes: bytes,
-    );
-    downloadUrls.add(url);
-  }
-} else {
-  // Mobile upload using File
-  for (var file in _images) {
-    final url = await _service.uploadImageUnified(
-      personId: id,
-      file: file,
-    );
-    downloadUrls.add(url);
-  }
-}
+      if (kIsWeb) {
+        for (var bytes in _webImages) {
+          final url = await _service.uploadImageUnified(
+            personId: id,
+            bytes: bytes,
+          );
+          downloadUrls.add(url);
+        }
+      } else {
+        for (var file in _images) {
+          final url = await _service.uploadImageUnified(
+            personId: id,
+            file: file,
+          );
+          downloadUrls.add(url);
+        }
+      }
 
-
-
-
-      // Build the person model
       final person = MissingPerson(
         id: id,
         name: _name,
@@ -106,116 +95,183 @@ if (kIsWeb) {
         physicalDescription: _description,
         lastSeenLocation: _lastSeenLocation,
         photos: downloadUrls,
-        status: "missing",
-        submittedBy: _service.currentUserId ?? "anonymous",
+        status: 'missing',
+        submittedBy: _service.currentUserId ?? 'anonymous',
         createdAt: DateTime.now(),
       );
 
       await _service.addMissingPerson(person);
 
+      if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Missing person submitted successfully.")),
+        const SnackBar(content: Text('Missing person submitted successfully.')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
 
-    setState(() => _loading = false);
+    if (mounted) {
+      setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Report Missing Person")),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // NAME
-              TextFormField(
-                decoration: InputDecoration(labelText: "Full Name"),
-                validator: (v) => v!.isEmpty ? "Required" : null,
-                onSaved: (v) => _name = v!,
-              ),
-
-              // AGE
-              TextFormField(
-                decoration: InputDecoration(labelText: "Age"),
-                keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? "Required" : null,
-                onSaved: (v) => _age = int.parse(v!),
-              ),
-
-              // GENDER
-              DropdownButtonFormField(
-                decoration: InputDecoration(labelText: "Gender"),
-                initialValue: _gender,
-                items: ["Male", "Female", "Other"]
-                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                    .toList(),
-                onChanged: (v) => setState(() => _gender = v!),
-              ),
-
-              // DESCRIPTION
-              TextFormField(
-                decoration: InputDecoration(labelText: "Physical Description"),
-                maxLines: 3,
-                validator: (v) => v!.isEmpty ? "Required" : null,
-                onSaved: (v) => _description = v!,
-              ),
-
-              // LAST SEEN
-              TextFormField(
-                decoration: InputDecoration(labelText: "Last Seen Location"),
-                validator: (v) => v!.isEmpty ? "Required" : null,
-                onSaved: (v) => _lastSeenLocation = v!,
-              ),
-
-              SizedBox(height: 20),
-
-              // IMAGES
-              Text("Photos", style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
-
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
+      appBar: AppBar(title: const Text('Report Missing Person')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.section),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (kIsWeb)
-                    ..._webImages.map(
-                      (bytes) => Image.memory(bytes, height: 80, width: 80, fit: BoxFit.cover),
-                    )
-                  else
-                    ..._images.map(
-                      (file) => Image.file(file, height: 80, width: 80, fit: BoxFit.cover),
+                  const ScreenHeader(
+                    title: 'Submit a Missing Person Report',
+                    subtitle:
+                        'Provide clear details to help responders and the community.',
+                  ),
+                  const SizedBox(height: AppSpacing.section),
+                  AppCard(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          decoration:
+                              const InputDecoration(labelText: 'Full Name'),
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          onSaved: (v) => _name = v!,
+                        ),
+                        const SizedBox(height: AppSpacing.standard),
+                        TextFormField(
+                          decoration: const InputDecoration(labelText: 'Age'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          onSaved: (v) => _age = int.parse(v!),
+                        ),
+                        const SizedBox(height: AppSpacing.standard),
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(labelText: 'Gender'),
+                          initialValue: _gender,
+                          items: ['Male', 'Female', 'Other']
+                              .map(
+                                (g) => DropdownMenuItem(value: g, child: Text(g)),
+                              )
+                              .toList(),
+                          onChanged: (v) => setState(() => _gender = v!),
+                        ),
+                        const SizedBox(height: AppSpacing.standard),
+                        TextFormField(
+                          decoration: const InputDecoration(
+                            labelText: 'Physical Description',
+                          ),
+                          maxLines: 3,
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          onSaved: (v) => _description = v!,
+                        ),
+                        const SizedBox(height: AppSpacing.standard),
+                        TextFormField(
+                          decoration: const InputDecoration(
+                            labelText: 'Last Seen Location',
+                          ),
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          onSaved: (v) => _lastSeenLocation = v!,
+                        ),
+                      ],
                     ),
-                  InkWell(
-                    onTap: pickImages,
-                    child: Container(
-                      height: 80,
-                      width: 80,
-                      color: Colors.grey[300],
-                      child: Icon(Icons.add),
+                  ),
+                  const SizedBox(height: AppSpacing.section),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                          title: 'Photos',
+                          icon: Icons.photo_library_outlined,
+                        ),
+                        const SizedBox(height: AppSpacing.tight),
+                        const Text(
+                          'Add clear recent photos to improve identification.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: AppSpacing.standard),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            if (kIsWeb)
+                              ..._webImages.map(
+                                (bytes) => ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.standard),
+                                  child: Image.memory(
+                                    bytes,
+                                    height: 90,
+                                    width: 90,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              )
+                            else
+                              ..._images.map(
+                                (file) => ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.standard),
+                                  child: Image.file(
+                                    file,
+                                    height: 90,
+                                    width: 90,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            InkWell(
+                              onTap: pickImages,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.standard),
+                              child: Container(
+                                height: 90,
+                                width: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.standard),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: const Icon(Icons.add_a_photo_outlined),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.section),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : submitForm,
+                      child: _loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Submit Report'),
                     ),
                   ),
                 ],
               ),
-
-              SizedBox(height: 30),
-
-              // SUBMIT
-              ElevatedButton(
-                onPressed: _loading ? null : submitForm,
-                child: _loading
-                    ? CircularProgressIndicator(color: Colors.white)
-                    : Text("Submit"),
-              ),
-            ],
+            ),
           ),
         ),
       ),
